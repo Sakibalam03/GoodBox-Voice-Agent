@@ -1,0 +1,2 @@
+pipecat-ai[runner,cartesia,deepgram,groq,webrtc]==1.7.0
+python-dotenv==1.2.2
