@@ -52,7 +52,7 @@ flowchart LR
         local -->|Other company / unrelated| refusal[Fixed safe refusal]
         local -->|Apple FAQ candidate| speculate[Speculative Groq request\nwhile the user speaks]
         speculate --> final[Final transcript +\nGroq GPT-OSS-20B]
-        final --> protocol{OK| / NO|\nprotocol validation}
+        final --> protocol{OK or NO\nprotocol validation}
         protocol -->|OK| answer[Approved spoken answer]
         protocol -->|NO / invalid| refusal
     end
