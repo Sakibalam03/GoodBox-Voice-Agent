@@ -4,6 +4,10 @@ An English/Hindi Apple FAQ voice assistant built with Pipecat. The canonical ent
 
 It uses streaming speech recognition, semantic end-of-turn detection, speculative LLM routing, and streamed speech synthesis to keep normal responses near the sub-second range while failing closed outside the approved FAQ scope.
 
+![Voice bot interface](<assets/Screenshot 2026-08-17 060524.png>)
+
+![Latency metrics](<assets/Screenshot 2026-08-18 035812.png>)
+
 ## Quick start
 
 Requires Python 3.11+ and API keys for Deepgram, Groq, and Cartesia.
@@ -37,34 +41,23 @@ Open <http://localhost:7860>, start a WebRTC session, allow microphone access, a
 
 ```mermaid
 flowchart LR
-    mic([Browser microphone]) --> rtcIn[WebRTC input]
-
-    subgraph turn[Turn detection and transcription]
-        rtcIn --> vad[Silero VAD\nspeech activity]
-        vad --> smart[Pipecat Local Smart Turn v3.2\nsemantic endpointing]
-        smart --> stt[Deepgram Nova-3\nmultilingual streaming STT]
-    end
-
-    subgraph control[FAQ control plane]
-        stt --> interim[Interim + final transcripts]
-        interim --> controller[Streaming FAQ Controller]
-        controller --> local{Local scope check}
-        local -->|Other company / unrelated| refusal[Fixed safe refusal]
-        local -->|Apple FAQ candidate| speculate[Speculative Groq request\nwhile the user speaks]
-        speculate --> final[Final transcript +\nGroq GPT-OSS-20B]
-        final --> protocol{OK or NO\nprotocol validation}
-        protocol -->|OK| answer[Approved spoken answer]
-        protocol -->|NO / invalid| refusal
-    end
-
-    subgraph speech[Speech output]
-        answer --> tts[Cartesia Sonic 3.5\nsentence aggregation]
-        refusal --> tts
-        tts --> rtcOut[WebRTC output]
-        rtcOut --> speaker([Browser speaker])
-        answer -. completed text .-> ui[RTVI conversation UI]
-        refusal -. completed text .-> ui
-    end
+    mic[Browser microphone] --> webRtcIn[WebRTC input]
+    webRtcIn --> vad[Silero VAD]
+    vad --> smartTurn[Local Smart Turn v3.2 semantic endpointing]
+    smartTurn --> stt[Deepgram Nova-3 multilingual STT]
+    stt --> controller[Streaming FAQ Controller]
+    controller --> scope{Apple FAQ scope check}
+    scope --> llm[Groq GPT-OSS-20B speculative and final routing]
+    scope --> refusal[Fixed safe refusal]
+    llm --> validation{Validated approved response}
+    validation --> answer[Approved spoken answer]
+    validation --> refusal
+    answer --> tts[Cartesia Sonic 3.5 sentence TTS]
+    refusal --> tts
+    tts --> webRtcOut[WebRTC output]
+    webRtcOut --> speaker[Browser speaker]
+    answer --> ui[RTVI conversation UI]
+    refusal --> ui
 ```
 
 ### Turn flow
@@ -134,7 +127,7 @@ Example results from a recent 11-turn local run:
 | Measurement | Result |
 | --- | ---: |
 | EOT → first bot audio p50 | 667 ms |
-| EOT → first bot audio p90 | 892 ms |
+| EOT → first bot audio p90 | 792 ms |
 | EOT → first bot audio p95 / max | 1424 ms |
 | Deepgram STT TTFB | ~515–592 ms |
 | Cartesia TTS TTFB | ~95–129 ms |
@@ -161,15 +154,3 @@ All settings below are optional unless marked required.
 | `SPECULATION_MIN_CHARS` | `12` | Minimum characters required for speculation |
 | `SPECULATION_MAX_RESTARTS` | `2` | Max speculative request restarts per turn |
 | `CARTESIA_MODEL` | `sonic-3.5` | Cartesia speech model |
-
-## Repository layout
-
-```text
-main.py                    Current streaming root implementation
-old-architecture/          Earlier reference implementation
-revamped-architecture/     Separate cache/local-router experiments
-.env.example               Required keys and optional configuration
-requirements.txt           Python dependencies
-```
-
-`old-architecture/` and `revamped-architecture/` are retained for comparison; they are not used by root `main.py`.
